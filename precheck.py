@@ -49,9 +49,9 @@ def create_folders():
 
 def cleaning_out_my_closet():
     """clear out corrupst files by deleting any file less than 1MB from the Records folder"""
-    MAX_SIZE = 1_000_000
+    MIN_SIZE = 1_000_000
     for file in (settings.HOME_DIR / "Records").iterdir():
-        if file.stat().st_size < MAX_SIZE:
+        if file.stat().st_size < MIN_SIZE:
             file.unlink()
             print(f"Deleted {file.name}")
 

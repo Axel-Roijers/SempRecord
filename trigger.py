@@ -15,7 +15,7 @@ def trigger_thread(interval=5):
     while settings.USE_AUTOTRIGGER:
         sleep(interval)
         window_title = getForegroundWindowTitle()
-        if bouncer.isWhiteListed(window_title) and recorder.REC is None:
+        if bouncer.isWhiteListed(window_title) and recorder.ACTIVE_RECORDER is None:
             tray.start()
 
 def enable():

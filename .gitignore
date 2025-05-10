@@ -17,3 +17,5 @@ cleaned_corpus.pkl
 corpus.pkl
 /venv
 /.vscode
+todo.md
+/.venv

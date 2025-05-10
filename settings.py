@@ -7,10 +7,19 @@ RUN_ON_BOOT: bool = False
 FRAME_RATE: int = 15
 THUMBNAIL_RESOLUTION_REDUCTION: int = 5
 THUMBNAIL_SECONDS_INTERVAL: int = 100  # in seconds
-CHANGE_THRESHOLD = 2500  # sub-pixels
+CHANGE_THRESHOLD = 500  # sub-pixels
 USE_AUTOTRIGGER = False
 QUALITY = 32
 #-------------------------------------------------
+
+try:
+    user_dir_path = HOME_DIR / ".settings" / "recording_dir.txt"
+    if user_dir_path.exists():
+        with open(user_dir_path, "r") as f:
+            chosen_path = f.read().strip()
+        HOME_DIR = Path(chosen_path)
+except:
+    pass
 
 def as_dict():
     settings = {}
@@ -40,5 +49,4 @@ def load():
                 globals()[k] = v
             else:
                 print(f"Unrecognized setting: {k}")
-        HOME_DIR = Path(HOME_DIR)
-        
+        HOME_DIR = Path(settings.get("HOME_DIR", HOME_DIR))

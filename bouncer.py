@@ -16,8 +16,8 @@ WHITELIST = tuple()
 BLACKLIST = tuple()
 
 
-def isWhiteListed(app_name: str) -> bool:
-    """Returns True if the app is whitelisted or no focus is on an app."""
+def isWhiteListed(app_name: str) -> str|bool:
+    """Returns the whitlisted app name if it is whitelisted, otherwise False."""
 
     if not app_name:
         return False
@@ -27,7 +27,7 @@ def isWhiteListed(app_name: str) -> bool:
 
     for wl in WHITELIST:
         if app_name.endswith(wl) or app_name.startswith(wl):
-            return True
+            return wl
 
     return False
 

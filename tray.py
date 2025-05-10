@@ -22,7 +22,7 @@ def exit_program():
  
 
 def open_folder():
-    os.startfile(str(settings.HOME_DIR / "Records"))
+    os.startfile(str(settings.HOME_DIR))
 
 
 def open_browser():
@@ -39,7 +39,7 @@ def toast(message):
 # and one that opens the management page in the browser
 def start():
     name = recorder.start()
-    TRAY.icon = ICONS.active
+    TRAY.icon = ICONS.manual_recording
     TRAY.menu = generate_menu(recording=True)
     TRAY.title = "SempRecord - Recording"
     toast('🔴 Record started | '+name)
@@ -70,10 +70,10 @@ def flip_auto_trigger(icon, item):
     state = not item.checked
     settings.USE_AUTOTRIGGER = state
     if state:
-        TRAY.icon = ICONS.standby if not recorder.is_recording() else ICONS.active
+        TRAY.icon = ICONS.standby if not recorder.is_recording() else ICONS.manual_recording
         trigger.enable()
     else:
-        TRAY.icon = ICONS.inactive if not recorder.is_recording() else ICONS.active
+        TRAY.icon = ICONS.inactive if not recorder.is_recording() else ICONS.manual_recording
         trigger.disable()
  
 def flip_run_on_boot(icon, item):
@@ -84,7 +84,13 @@ def flip_run_on_boot(icon, item):
     else:
         run_on_boot.disable()
 
-
+def extract_app():
+    """
+    Handler for the "Extract app" menu option.
+    Currently does nothing, but will be implemented later.
+    """
+    # To be implemented
+    pass
 def generate_menu(recording=False, paused=False):
     menu_items = []
     if paused:
@@ -101,6 +107,7 @@ def generate_menu(recording=False, paused=False):
     pystray.MenuItem("Run on boot", flip_run_on_boot, checked=lambda _:settings.RUN_ON_BOOT),
     pystray.MenuItem("Open Folder", open_folder),
     pystray.MenuItem("Open Whitelist", bouncer.open_window, enabled=not recording),
+    pystray.MenuItem("Extract app", extract_app, enabled=not recording),
     pystray.MenuItem("Exit", exit_program)
     ])
 
@@ -127,11 +134,11 @@ def tray_status_thread():
     This function runs indefinitely until the program is terminated.
     """
     while True:
-        sleep(5)
+        sleep(10)
         if not recorder.is_recording():
             continue
 
-        status = recorder.REC.get_status()
+        status = recorder.ACTIVE_RECORDER.get_status()
         if not status:
             continue
         try:
