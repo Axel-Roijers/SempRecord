@@ -20,11 +20,11 @@ def print_green(text):
 
 
 
-CORPUS_PATH = Path(__file__).resolve().with_name("corpus.pkl")
+CORPUS_PATH = Path(__file__).resolve().with_name("original_corpus.pkl")
 
 def word_cleaner(word):
     # if the word is longer than 8 characters
-    if len(word) > 8:
+    if len(word) > 5:
         return False
     # if the word is shorter than 3 characters
     if len(word) < 3:

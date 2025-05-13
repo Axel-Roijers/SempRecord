@@ -1,35 +1,45 @@
 import os
+import tempfile
 import threading as tr
 from time import sleep
 
 import dxcam
 import ffmpeg
 
-import bouncer
-import util
-from filename_generator import generate_filename
-import settings
 # from thumbnailer import ThumbnailProcessor
 import numpy as np
-# import edl_module
-import tempfile
+
+import bouncer
+import timelines
+import settings
+import util
+from filename_generator import generate_filename
+
 CODEC = "hevc_nvenc" if util.nvenc_available() else "libx265"
 FFPATH = r".\ffmpeg.exe"
-
-SUBSAMPLE = 4  # subsample
-
-
+# MIN_FRAMES_PER_SWITCH = 15
+DIFF_SUBSAMPLE = 4 
 def frameDiff(A: np.ndarray, B: np.ndarray):
+    """
+    Calculate the difference between two frames by subsampling and comparing their elements.
+    This function downsamples the input arrays `A` and `B` by a factor defined by the 
+    global constant `DIFF_SUBSAMPLE`, then computes the total number of differing 
+    elements between the two subsampled arrays.
+    Args:
+        A (np.ndarray): The first input frame as a 2D NumPy array.
+        B (np.ndarray): The second input frame as a 2D NumPy array.
+    Returns:
+        int: The total count of differing elements between the subsampled frames.
+    """
     
-    A = A[::SUBSAMPLE, ::SUBSAMPLE]
-    B = B[::SUBSAMPLE, ::SUBSAMPLE]
+    A = A[::DIFF_SUBSAMPLE, ::DIFF_SUBSAMPLE]
+    B = B[::DIFF_SUBSAMPLE, ::DIFF_SUBSAMPLE]
     # summ the whole frame into one value
     diff = np.sum(A != B)
     return diff
 
 
 def mkv_encoder(width, height, path):
-    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mkv")
     return (
         ffmpeg.input(
             "pipe:",
@@ -65,16 +75,11 @@ class Recorder:
 
     def __init__(self):
         """Starts the recording process"""
+        self.file_name = generate_filename() + ".mkv"
+        self.path = settings.HOME_DIR / "Records"  / self.file_name
 
-        self.prev_window_title = util.getForegroundWindowTitle()
-        self.nframes = 0
-        # generate a file name that looks like this: Wednesday 18 January 2023 HH;MM.mkv
-        self.file_name = generate_filename()
-
-        # self.thumbnail_generator = ThumbnailProcessor(self.file_name)
-        # self.metadata_writer = edl_module.EdlDataWriter()
-
-        self.path = settings.HOME_DIR / f"{self.file_name}.mkv"
+        
+        self.total_frames_recorded = 0
         self.paused = False
         self.cut = False
         # start ffmpeg
@@ -98,35 +103,53 @@ class Recorder:
     def _record_thread(self):
         capturecam = dxcam.create()
         capturecam.start(target_fps=settings.FRAME_RATE)
-        old_frame = capturecam.get_latest_frame()
+
+        previous_frame = capturecam.get_latest_frame()
+        previous_switch_frame = 0
+        previous_appname = ""
 
         while not self.end_record_flag.is_set():
             new_frame = capturecam.get_latest_frame()
             if self.paused:
-                old_frame = new_frame
+                previous_frame = new_frame
                 continue
 
+            # PERFORM APP SWITCH CHECKS
             new_window_title = util.getForegroundWindowTitle()
-
-            if not bouncer.isWhiteListed(new_window_title):
+            
+            if not (new_appname:=bouncer.isWhiteListed(new_window_title)):
                 continue
 
             if bouncer.isBlackListed(new_window_title):
                 continue
 
-            if frameDiff(new_frame, old_frame) < settings.CHANGE_THRESHOLD:
+            if frameDiff(new_frame, previous_frame) < settings.CHANGE_THRESHOLD:
                 continue
 
-            if new_window_title != self.prev_window_title:
-                self.prev_window_title = new_window_title
-                # self.metadata_writer.add_chapter(self.nframes, new_window_title)
+            # AFTER THIS POINT, WE KNOW THAT THE FRAME IS VALID AND WE CAN PROCESS IT
+
+            if (
+                previous_appname != new_appname
+                and previous_appname != ""
+                and self.total_frames_recorded - previous_switch_frame >= 1
+            ):
+                # an app switch has occurred
+                timelines.register_take(
+                    appname=previous_appname,
+                    start_frame=previous_switch_frame,
+                    end_frame=self.total_frames_recorded,
+                    clip_name=self.file_name,
+                )
+                previous_switch_frame = self.total_frames_recorded
+                print(f"App switch detected: {new_appname}")
 
 
+            previous_appname = new_appname
             # Flush the frame to FFmpeg
             try:
-                self.ffprocess.stdin.write(old_frame.tobytes())  # write to pipe
-                old_frame = new_frame
-                self.nframes += 1
+                self.ffprocess.stdin.write(previous_frame.tobytes())  # write to pipe
+                previous_frame = new_frame
+                self.total_frames_recorded += 1
             except os.error:
                 break
         # the recording ends here
@@ -136,7 +159,6 @@ class Recorder:
         self.ffprocess.wait()
         capturecam.stop()
         print("Capture stopped 🎬")
-        # self.metadata_writer.add_chapters_to_video(self.path)
 
     def _status_thread(self):
         self.status = ""
@@ -175,10 +197,6 @@ class Recorder:
         # stop the status thread
         self.end_status_flag.set()
         self.end_record_flag.set()
-
-        # process the thumbnail queue
-        print("Processing thumbnail")
-        self.thumbnail_generator.render_webp_thumbnail()
 
 
 # ==========INTERFACE==========

@@ -35,8 +35,8 @@ def isWhiteListed(app_name: str) -> str|bool:
 def isBlackListed(app_name: str) -> bool:
     """Returns True if the app is blacklisted or no focus is on an app."""
 
-    if not app_name:
-        return False
+    if not app_name:# if no app is focused app_name ""
+        return True
 
     if not BLACKLIST:
         return False
